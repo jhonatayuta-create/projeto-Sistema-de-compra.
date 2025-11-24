@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
+    <title>Pedidos</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #f0f2f5;
+        }
+
+        /* Ajustes visuais */
+        .input-min-width { min-width: 100px; }
+        .qtd-min-width { min-width: 70px; }
+        .cod-min-width { min-width: 80px; }
+        
+        .status-orcamento { background-color: #ffc107; color: #000; }
+        .status-emitido { background-color: #198754; color: #fff; }
+        .status-cancelado { background-color: #dc3545; color: #fff; }
+
+        /* Deixa os inputs com borda mais suave */
+        .form-control, .form-select {
+            border-radius: 6px;
+            border: 1px solid #ced4da;
+        }
+        .form-control:focus {
+            box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.15);
+        }
+    </style>
+</head>
+<body class="bg-light">
+
+    <nav class="navbar navbar-dark bg-dark mb-3 shadow">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1 fw-bold">Sistema de Vendas</span>
+        </div>
+    </nav>
+
+    <div class="container bg-white p-4 shadow-sm rounded mb-5">
+        
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+            
+            <div class="d-flex flex-wrap gap-2">
+                <button class="btn btn-secondary shadow-sm" onclick="acaoVoltar()" title="Voltar para Lista">Voltar</button>
+                <button class="btn btn-info text-white shadow-sm" onclick="acaoNovo()" title="Limpar e criar novo">Novo</button>
+                
+                <div class="vr mx-2 d-none d-md-block"></div>
+
+                <button class="btn btn-success shadow-sm" onclick="acaoSalvar()">Salvar</button>
+                <button id="btnEmitir" class="btn btn-outline-primary shadow-sm" onclick="acaoEmitir()">Baixar PDF</button>
+                <button class="btn btn-outline-danger shadow-sm" onclick="acaoCancelar()">Cancelar</button>
+                <button class="btn btn-outline-dark shadow-sm" onclick="acaoEmail()">Criar Email</button>
+            </div>
+
+            <div class="mt-2 mt-md-0 text-end">
+                <small class="text-muted d-block fw-light">Status atual:</small>
+                <h4><span id="statusBadge" class="badge status-orcamento shadow-sm">Orçamento</span></h4>
+                <small id="pedidoIdDisplay" class="text-muted" style="font-size: 0.7em;">NOVO</small>
+            </div>
+        </div>
+
+        <div id="conteudoImpressao" class="p-2">
+            
+            <h4 class="mb-4 border-bottom pb-2 fw-semibold text-secondary">Detalhes do Pedido</h4>
+
+            <div class="row mb-3 g-3">
+                <div class="col-6 col-md-2">
+                    <label class="form-label text-muted small fw-bold">EMISSÃO</label>
+                    <input type="date" id="dataPedido" class="form-control">
+                </div>
+                <div class="col-12 col-md-5">
+                    <label class="form-label text-muted small fw-bold">CLIENTE</label>
+                    <input type="text" id="cliente" class="form-control" placeholder="Nome do cliente...">
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label text-muted small fw-bold">VENDEDOR</label>
+                    <input type="text" id="vendedor" class="form-control" placeholder="Nome do vendedor...">
+                </div>
+                <div class="col-6 col-md-2">
+                    <label class="form-label text-muted small fw-bold">PAGAMENTO</label>
+                    <select class="form-select" id="pagamento">
+                        <option value="Cartão de Crédito">Cartão de Crédito</option>
+                        <option value="Boleto">Boleto</option>
+                        <option value="Pix">Pix</option>
+                        <option value="Dinheiro">Dinheiro</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="table-responsive mb-3 border rounded shadow-sm">
+                <table class="table table-bordered align-middle mb-0" style="min-width: 700px;"> 
+                    <thead class="table-light">
+                        <tr class="text-uppercase small text-muted">
+                            <th width="100">Cód.</th>
+                            <th>Produto</th>
+                            <th width="120">Valor Unit.</th>
+                            <th width="80">Qtd</th>
+                            <th>Total</th>
+                            <th width="50" data-html2canvas-ignore="true"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="listaItens" class="bg-white">
+                        </tbody>
+                </table>
+            </div>
+            
+            <button class="btn btn-sm btn-light border w-100 mb-4 text-muted fw-bold" onclick="adicionarItem()" data-html2canvas-ignore="true">ADICIONAR ITEM</button>
+
+            <div class="row">
+                <div class="col-12 col-md-7 mb-3">
+                    <div class="card bg-white border shadow-sm mb-3">
+                        <div class="card-header bg-light py-2">
+                            <small class="fw-bold text-uppercase text-muted">Entrega</small>
+                        </div>
+                        <div class="card-body p-3">
+                            <div class="row g-2 mb-2">
+                                <div class="col-6">
+                                    <label class="small text-muted fw-bold">DATA PREVISTA</label>
+                                    <input type="date" id="entregaData" class="form-control form-control-sm">
+                                </div>
+                                <div class="col-6">
+                                    <label class="small text-muted fw-bold">CEP</label>
+                                    <input type="text" id="entregaCep" class="form-control form-control-sm" placeholder="00000-000">
+                                </div>
+                            </div>
+                            <div class="row g-2 mb-2">
+                                <div class="col-9">
+                                    <label class="small text-muted">LOGRADOURO</label>
+                                    <input type="text" id="entregaLogradouro" class="form-control form-control-sm">
+                                </div>
+                                <div class="col-3">
+                                    <label class="small text-muted">NÚMERO</label>
+                                    <input type="text" id="entregaNumero" class="form-control form-control-sm">
+                                </div>
+                            </div>
+                            <div class="row g-2">
+                                <div class="col-4">
+                                    <label class="small text-muted">COMPLEMENTO</label>
+                                    <input type="text" id="entregaCompl" class="form-control form-control-sm">
+                                </div>
+                                <div class="col-5">
+                                    <label class="small text-muted">CIDADE</label>
+                                    <input type="text" id="entregaCidade" class="form-control form-control-sm">
+                                </div>
+                                <div class="col-3">
+                                    <label class="small text-muted">UF</label>
+                                    <select id="entregaUf" class="form-select form-select-sm">
+                                        <option value="">--</option>
+                                        <option value="SP">SP</option>
+                                        <option value="RJ">RJ</option>
+                                        <option value="MG">MG</option>
+                                        <option value="RS">RS</option>
+                                        <option value="PR">PR</option>
+                                        <option value="SC">SC</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card border-0">
+                        <div class="card-body p-0">
+                            <label class="form-label fw-bold small text-muted text-uppercase">Observações</label>
+                            <textarea id="observacao" class="form-control shadow-sm" rows="2"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-md-5">
+                    <div class="bg-white p-3 rounded border shadow-sm">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Subtotal</span>
+                            <strong id="subtotalVal">R$ 0,00</strong>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mb-2 text-danger">
+                            <span class="small">Frete (+)</span>
+                            <input type="number" id="freteInput" class="form-control form-control-sm text-end bg-light" style="width: 100px;" value="0" onchange="calcularTotal()">
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mb-2 text-success">
+                            <span class="small">Desconto (-)</span>
+                            <input type="number" id="descInput" class="form-control form-control-sm text-end bg-light" style="width: 100px;" value="0" onchange="calcularTotal()">
+                        </div>
+                        <hr>
+                        <div class="d-flex justify-content-between fs-4 text-dark">
+                            <strong class="fw-bold">Total Final</strong>
+                            <strong id="totalFinal" class="fw-bold text-primary">R$ 0,00</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        let idAtual = null;
+        let statusAtual = "Orçamento";
+
+        window.onload = function() {
+            document.getElementById('dataPedido').valueAsDate = new Date();
+            const params = new URLSearchParams(window.location.search);
+            const idUrl = params.get('id');
+            if (idUrl) { carregarPedido(idUrl); } else { adicionarItem(); }
+        };
+
+        function acaoVoltar() { window.location.href = "home.html"; }
+
+        function acaoNovo() {
+            if(confirm("Deseja iniciar um novo pedido? Dados não salvos serão perdidos.")) {
+                idAtual = null;
+                document.getElementById('pedidoIdDisplay').innerText = "NOVO";
+                window.history.pushState({}, document.title, window.location.pathname);
+                document.getElementById('cliente').value = "";
+                document.getElementById('vendedor').value = "";
+                document.getElementById('observacao').value = "";
+                document.getElementById('entregaData').value = "";
+                document.getElementById('entregaCep').value = "";
+                document.getElementById('entregaLogradouro').value = "";
+                document.getElementById('entregaNumero').value = "";
+                document.getElementById('entregaCompl').value = "";
+                document.getElementById('entregaCidade').value = "";
+                document.getElementById('entregaUf').value = "";
+                document.getElementById('freteInput').value = "0";
+                document.getElementById('descInput').value = "0";
+                atualizarBadgeStatus("Orçamento");
+                document.getElementById('dataPedido').valueAsDate = new Date();
+                document.getElementById("listaItens").innerHTML = "";
+                adicionarItem();
+                calcularTotal();
+            }
+        }
+
+        function atualizarBadgeStatus(status) {
+            const badge = document.getElementById("statusBadge");
+            statusAtual = status;
+            badge.innerText = status;
+            badge.className = "badge shadow-sm"; 
+            if(status === "Orçamento") badge.classList.add("status-orcamento");
+            if(status === "Emitido") badge.classList.add("status-emitido");
+            if(status === "Cancelado") badge.classList.add("status-cancelado");
+        }
+
+        function carregarPedido(id) {
+            const pedidos = JSON.parse(localStorage.getItem('sistema_pedidos')) || [];
+            const pedidoEncontrado = pedidos.find(p => p.id == id);
+            if (pedidoEncontrado) {
+                idAtual = pedidoEncontrado.id;
+                document.getElementById('pedidoIdDisplay').innerText = "#" + idAtual;
+                document.getElementById('cliente').value = pedidoEncontrado.cliente;
+                document.getElementById('vendedor').value = pedidoEncontrado.vendedor;
+                document.getElementById('pagamento').value = pedidoEncontrado.pagamento;
+                document.getElementById('dataPedido').value = pedidoEncontrado.dataISO || new Date().toISOString().split('T')[0];
+                document.getElementById('freteInput').value = pedidoEncontrado.frete;
+                document.getElementById('descInput').value = pedidoEncontrado.desconto;
+                document.getElementById('observacao').value = pedidoEncontrado.observacao || "";
+                if(pedidoEncontrado.entrega) {
+                    document.getElementById('entregaData').value = pedidoEncontrado.entrega.data || "";
+                    document.getElementById('entregaCep').value = pedidoEncontrado.entrega.cep || "";
+                    document.getElementById('entregaLogradouro').value = pedidoEncontrado.entrega.logradouro || "";
+                    document.getElementById('entregaNumero').value = pedidoEncontrado.entrega.numero || "";
+                    document.getElementById('entregaCompl').value = pedidoEncontrado.entrega.compl || "";
+                    document.getElementById('entregaCidade').value = pedidoEncontrado.entrega.cidade || "";
+                    document.getElementById('entregaUf').value = pedidoEncontrado.entrega.uf || "";
+                }
+                atualizarBadgeStatus(pedidoEncontrado.status || "Orçamento");
+                const tbody = document.getElementById("listaItens");
+                tbody.innerHTML = ""; 
+                if(pedidoEncontrado.itens) {
+                    pedidoEncontrado.itens.forEach(item => {
+                        adicionarItem(item.codigo, item.nome, item.valor, item.qtd);
+                    });
+                } else { adicionarItem(); }
+                calcularTotal();
+            }
+        }
+
+        function adicionarItem(codigo = "", nome = "", valor = "", qtd = "1") {
+            const tbody = document.getElementById("listaItens");
+            const novaLinha = `
+                <tr>
+                    <td><input type="text" class="form-control cod-min-width border-0 codigo-prod" placeholder="SKU" value="${codigo}"></td>
+                    <td><input type="text" class="form-control input-min-width border-0 nome-prod" placeholder="Produto" value="${nome}"></td>
+                    <td><input type="number" class="form-control valor-unit input-min-width" placeholder="0.00" onchange="calcularTotal()" value="${valor}"></td>
+                    <td><input type="number" class="form-control qtd qtd-min-width" onchange="calcularTotal()" value="${qtd}"></td>
+                    <td class="total-linha fw-bold text-end">R$ 0,00</td>
+                    <td data-html2canvas-ignore="true"><button class="btn btn-sm btn-outline-danger border-0" onclick="removerLinha(this)">✕</button></td>
+                </tr>`;
+            tbody.insertAdjacentHTML('beforeend', novaLinha);
+            calcularTotal();
+        }
+
+        function removerLinha(btn) { btn.closest("tr").remove(); calcularTotal(); }
+
+        function calcularTotal() {
+            let totalGeral = 0;
+            document.querySelectorAll("#listaItens tr").forEach(linha => {
+                const valor = parseFloat(linha.querySelector(".valor-unit").value) || 0;
+                const qtd = parseFloat(linha.querySelector(".qtd").value) || 0;
+                const total = valor * qtd;
+                linha.querySelector(".total-linha").innerText = total.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
+                totalGeral += total;
+            });
+            const frete = parseFloat(document.getElementById("freteInput").value) || 0;
+            const desconto = parseFloat(document.getElementById("descInput").value) || 0;
+            document.getElementById("subtotalVal").innerText = totalGeral.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
+            const final = totalGeral + frete - desconto;
+            document.getElementById("totalFinal").innerText = final.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
+            return final;
+        }
+
+        function acaoSalvar() { salvarPedido(statusAtual); alert("Pedido salvo com sucesso!"); }
+        function acaoCancelar() { if (confirm("Deseja CANCELAR este pedido?")) { atualizarBadgeStatus("Cancelado"); salvarPedido("Cancelado"); alert("Pedido cancelado."); window.location.href = "home.html"; } }
+
+        function acaoEmitir() {
+            if (!confirm("Gerar PDF do pedido?")) return;
+            const btn = document.getElementById("btnEmitir");
+            const textoOriginal = btn.innerText;
+            btn.innerText = "⏳ Gerando...";
+            btn.disabled = true;
+            atualizarBadgeStatus("Emitido");
+            salvarPedido("Emitido");
+            const elemento = document.getElementById('conteudoImpressao');
+            const nomeArquivo = `Pedido_${idAtual || 'Novo'}_${document.getElementById('cliente').value}.pdf`;
+            const opt = {
+                margin: 5,
+                filename: nomeArquivo,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+            html2pdf().set(opt).from(elemento).save()
+                .then(() => { btn.innerText = textoOriginal; btn.disabled = false; })
+                .catch(err => { console.error(err); alert("Erro ao gerar PDF."); btn.innerText = textoOriginal; btn.disabled = false; });
+        }
+
+        function acaoEmail() {
+            const cliente = document.getElementById("cliente").value;
+            const total = document.getElementById("totalFinal").innerText;
+            if(!cliente) return alert("Preencha o cliente!");
+            const email = prompt("Email do cliente:", "");
+            if(email) {
+                const assunto = `Pedido - ${cliente}`;
+                const corpo = `Olá, segue o pedido no valor de ${total}.`;
+                window.location.href = `mailto:${email}?subject=${assunto}&body=${corpo}`;
+            }
+        }
+
+        function salvarPedido(statusParaSalvar) {
+            const cliente = document.getElementById("cliente").value;
+            if(!cliente) return alert("Preencha o cliente!");
+            const itens = [];
+            document.querySelectorAll("#listaItens tr").forEach(linha => {
+                const codigo = linha.querySelector(".codigo-prod").value;
+                const nome = linha.querySelector(".nome-prod").value;
+                const valor = linha.querySelector(".valor-unit").value;
+                const qtd = linha.querySelector(".qtd").value;
+                if(nome || codigo) itens.push({ codigo, nome, valor, qtd });
+            });
+            const dadosEntrega = {
+                data: document.getElementById('entregaData').value,
+                cep: document.getElementById('entregaCep').value,
+                logradouro: document.getElementById('entregaLogradouro').value,
+                numero: document.getElementById('entregaNumero').value,
+                compl: document.getElementById('entregaCompl').value,
+                cidade: document.getElementById('entregaCidade').value,
+                uf: document.getElementById('entregaUf').value
+            };
+            const pedidoObj = {
+                id: idAtual ? idAtual : Math.floor(Math.random() * 10000),
+                cliente: cliente,
+                vendedor: document.getElementById("vendedor").value,
+                pagamento: document.getElementById("pagamento").value,
+                dataISO: document.getElementById("dataPedido").value, 
+                data: new Date(document.getElementById("dataPedido").value).toLocaleDateString('pt-BR'),
+                frete: document.getElementById("freteInput").value,
+                desconto: document.getElementById("descInput").value,
+                observacao: document.getElementById("observacao").value,
+                entrega: dadosEntrega,
+                total: document.getElementById("totalFinal").innerText,
+                status: statusParaSalvar,
+                itens: itens
+            };
+            let pedidosSalvos = JSON.parse(localStorage.getItem('sistema_pedidos')) || [];
+            if (idAtual) pedidosSalvos = pedidosSalvos.filter(p => p.id != idAtual);
+            pedidosSalvos.push(pedidoObj);
+            localStorage.setItem('sistema_pedidos', JSON.stringify(pedidosSalvos));
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
